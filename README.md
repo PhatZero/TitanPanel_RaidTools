@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/PhatZero/TitanPanel_RaidTools/main/AddOn/media/banner.png" width="600"/>
+  <img src="https://raw.githubusercontent.com/PhatZero/TitanPanel_RaidTools/main/banner.png" width="600"/>
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/PhatZero/TitanPanel_RaidTools/main/AddOn/media/icon.png" width="96"/>
+  <img src="https://raw.githubusercontent.com/PhatZero/TitanPanel_RaidTools/main/icon.png" width="96"/>
 </p>
 
 <h1 align="center">TitanPanel_RaidTools</h1>
