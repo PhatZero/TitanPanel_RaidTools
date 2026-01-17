@@ -1,0 +1,16 @@
+## Interface: 100207
+## Title: Titan Panel: Raid Tools
+## Notes: Ready checks, battle res tracking, and marker utilities for Titan Panel.
+## Author: PhatZero
+## Version: 1.0.0
+## Dependencies: Titan
+## SavedVariables: TitanPanelRaidToolsDB
+
+## IconTexture: Interface/AddOns/TitanPanelRaidTools/media/icon
+## X-Banner: Interface/AddOns/TitanPanelRaidTools/media/banner
+
+Compat.lua
+Core.lua
+TitanPlugin.lua
+BattleRes.lua
+Markers.lua
