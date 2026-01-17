@@ -6,6 +6,8 @@
 ## Dependencies: Titan
 ## SavedVariables: TitanPanelRaidToolsDB
 
+## X-Curse-Project-ID: 1432021
+
 ## IconTexture: Interface/AddOns/TitanPanelRaidTools/media/icon
 ## X-Banner: Interface/AddOns/TitanPanelRaidTools/media/banner
 
