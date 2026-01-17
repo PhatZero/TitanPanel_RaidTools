@@ -1,172 +1,166 @@
 local addonName, ns = ...
+local Compat = ns.Compat
 
-local ID = "RaidTools"
-local BR = ns.BR
-local Markers = ns.Markers
+local TITAN_ID = "RaidTools"
+local TITAN_BUTTON = "TitanPanel" .. TITAN_ID .. "Button"
+
+local function IsLeaderOrAssist()
+    return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
+end
+
+local function DoReadyCheckCompat()
+    if not IsInGroup() then
+        print("|cffffd100[RaidTools]|r You are not in a group.")
+        return
+    end
+    if not IsLeaderOrAssist() then
+        print("|cffffd100[RaidTools]|r You must be leader/assistant to start a ready check.")
+        return
+    end
+    if type(DoReadyCheck) == "function" then
+        DoReadyCheck()
+        return
+    end
+    if type(RunMacroText) == "function" then
+        RunMacroText("/readycheck")
+        return
+    end
+    print("|cffffd100[RaidTools]|r Ready check is not available on this client.")
+end
+
+local function HasWorldMarkers()
+    return (Compat and Compat.HasWorldMarkers and Compat.HasWorldMarkers()) or false
+end
+
+local function PlaceWorldMarker(markerIndex)
+    if not IsInGroup() then
+        print("|cffffd100[RaidTools]|r You are not in a group.")
+        return
+    end
+    if not IsLeaderOrAssist() then
+        print("|cffffd100[RaidTools]|r You must be leader/assistant to place world markers.")
+        return
+    end
+    if InCombatLockdown() then
+        print("|cffff0000[RaidTools]|r Cannot place world markers in combat.")
+        return
+    end
+    if not HasWorldMarkers() then
+        print("|cffffd100[RaidTools]|r World markers are not supported on this client.")
+        return
+    end
+    if type(RunMacroText) == "function" then
+        -- Note: /wm enters placement mode; click the ground to drop it.
+        RunMacroText("/wm " .. tostring(markerIndex))
+    end
+end
+
+local function ClearWorldMarkers()
+    if not IsInGroup() then
+        print("|cffffd100[RaidTools]|r You are not in a group.")
+        return
+    end
+    if not IsLeaderOrAssist() then
+        print("|cffffd100[RaidTools]|r You must be leader/assistant to clear world markers.")
+        return
+    end
+    if InCombatLockdown() then
+        print("|cffff0000[RaidTools]|r Cannot clear world markers in combat.")
+        return
+    end
+    if not HasWorldMarkers() then
+        print("|cffffd100[RaidTools]|r World markers are not supported on this client.")
+        return
+    end
+
+    if type(ClearRaidMarker) == "function" then
+        ClearRaidMarker()
+        return
+    end
+    if type(RunMacroText) == "function" then
+        RunMacroText("/cwm 0")
+    end
+end
+
+-------------------------------------------------------
+-- Titan Button
+-------------------------------------------------------
+local button = CreateFrame("Button", TITAN_BUTTON, UIParent, "TitanPanelComboTemplate")
+button.registry = {
+    id = TITAN_ID,
+    category = "General",
+    version = "1.0.0",
+    menuText = "RaidTools",
+    buttonTextFunction = "TitanPanelRaidToolsButton_GetButtonText",
+    tooltipTitle = "RaidTools",
+    tooltipTextFunction = "TitanPanelRaidToolsButton_GetTooltipText",
+    icon = "Interface\\AddOns\\TitanPanelRaidTools\\media\\icon",
+    iconWidth = 16,
+    savedVariables = {
+        ShowIcon = 1,
+        ShowLabelText = 1,
+        ShowColoredText = 1,
+    },
+}
 
 function TitanPanelRaidToolsButton_GetButtonText(id)
-    local label = "Raid Tools"
-    local value = BR:GetDisplayText()
-    return label, value
+    return "RaidTools"
 end
 
 function TitanPanelRaidToolsButton_GetTooltipText()
-    local lines = {}
-
-    table.insert(lines, "|cffffd100Ready Check|r")
-    if ns.readyActive then
-        table.insert(lines, string.format("In progress by: |cffffffff%s|r", ns.readyInitiator or "Unknown"))
-    end
-
-    if next(ns.readyStatus) then
-        table.insert(lines, " ")
-        for name, ready in pairs(ns.readyStatus) do
-            local icon = ready and "|cff00ff00Ready|r" or "|cffff0000Not Ready|r"
-            table.insert(lines, string.format("%s - %s", name, icon))
-        end
-    else
-        table.insert(lines, "No recent ready check data.")
-    end
-
-    table.insert(lines, " ")
-    local brLines = BR:GetTooltipLines()
-    for _, l in ipairs(brLines) do
-        table.insert(lines, l)
-    end
-
-    table.insert(lines, " ")
-    table.insert(lines, "|cffffd100Left-click|r: Ready Check")
-    table.insert(lines, "|cffffd100Right-click|r: Markers & Options")
-
-    return table.concat(lines, "\n")
+    return "Right-click: Ready Check & World Markers"
 end
 
-function TitanPanelRaidToolsButton_OnClick(self, button)
-    if button == "LeftButton" then
-        DoReadyCheck()
-    elseif button == "RightButton" then
-        TitanPanelButton_OnClick(self, button)
-    end
-end
-
-function TitanPanelRaidToolsButton_RightClickMenu_PrepareMenu(self, level)
-    if not level then return end
+-------------------------------------------------------
+-- Titan Right-click Menu
+-- RaidTools
+--  -> ReadyCheck
+--  -> World Markers (submenu)
+-------------------------------------------------------
+function TitanPanelRightClickMenu_PrepareRaidToolsMenu()
+    local info
+    local level = UIDROPDOWNMENU_MENU_LEVEL
+    local value = UIDROPDOWNMENU_MENU_VALUE
 
     if level == 1 then
-        TitanPanelRightClickMenu_AddTitle("Raid Tools")
+        TitanPanelRightClickMenu_AddTitle("RaidTools")
 
-        TitanPanelRightClickMenu_AddCommand("Ready Check", ID, "TitanPanelRaidToolsButton_DoReadyCheck")
+        info = UIDropDownMenu_CreateInfo()
+        info.text = "ReadyCheck"
+        info.notCheckable = true
+        info.func = DoReadyCheckCompat
+        UIDropDownMenu_AddButton(info, level)
 
-        TitanPanelRightClickMenu_AddSpacer()
-
-        TitanPanelRightClickMenu_AddTitle("Raid Target Icons")
-        local raidMarkers = {
-            { text = "Skull",    id = 8 },
-            { text = "Cross",    id = 7 },
-            { text = "Square",   id = 6 },
-            { text = "Moon",     id = 5 },
-            { text = "Triangle", id = 4 },
-            { text = "Diamond",  id = 3 },
-            { text = "Circle",   id = 2 },
-            { text = "Star",     id = 1 },
-        }
-
-        for _, m in ipairs(raidMarkers) do
-            TitanPanelRightClickMenu_AddCommand(m.text, ID, "TitanPanelRaidToolsButton_SetRaidMarker" .. m.id)
+        info = UIDropDownMenu_CreateInfo()
+        info.text = "World Markers"
+        info.notCheckable = true
+        info.hasArrow = true
+        info.value = "WORLD_MARKERS"
+        if not HasWorldMarkers() then
+            info.disabled = true
         end
+        UIDropDownMenu_AddButton(info, level)
 
         TitanPanelRightClickMenu_AddSpacer()
+        TitanPanelRightClickMenu_AddCommand(TITAN_PANEL_MENU_HIDE, TITAN_ID, TITAN_PANEL_MENU_FUNC_HIDE)
 
-        TitanPanelRightClickMenu_AddTitle("World Markers (Raid)")
+    elseif level == 2 and value == "WORLD_MARKERS" then
+        local names = { "Star", "Circle", "Diamond", "Triangle", "Moon", "Square", "Cross", "Skull" }
 
         for i = 1, 8 do
-            TitanPanelRightClickMenu_AddCommand("Marker " .. i, ID, "TitanPanelRaidToolsButton_SetWorldMarker" .. i)
-        end
-
-        TitanPanelRightClickMenu_AddCommand("Clear World Markers", ID, "TitanPanelRaidToolsButton_ClearWorldMarkers")
-
-        TitanPanelRightClickMenu_AddSpacer()
-
-        TitanPanelRightClickMenu_AddTitle("Display Mode")
-
-        local current = ns.db.DisplayMode or "SMART"
-
-        local function AddMode(label, value)
-            local info = {}
-            info.text = label
-            info.func = function()
-                ns.db.DisplayMode = value
-                if TitanPanelButton_UpdateButton then
-                    TitanPanelButton_UpdateButton(ID)
-                end
-            end
-            info.checked = (current == value)
+            info = UIDropDownMenu_CreateInfo()
+            info.text = names[i]
+            info.notCheckable = true
+            info.func = function() PlaceWorldMarker(i) end
             UIDropDownMenu_AddButton(info, level)
         end
 
-        AddMode("Charges Only", "CHARGES")
-        AddMode("Charges + Cooldown", "COOLDOWN")
-        AddMode("Smart Auto (default)", "SMART")
-
         TitanPanelRightClickMenu_AddSpacer()
 
-        TitanPanelRightClickMenu_AddCommand("Open Blizzard Options", ID, "TitanPanelRaidToolsButton_OpenOptions")
-
-        TitanPanelRightClickMenu_AddSpacer()
-        TitanPanelRightClickMenu_AddToggleIcon(ID)
-        TitanPanelRightClickMenu_AddToggleLabelText(ID)
-        TitanPanelRightClickMenu_AddToggleColoredText(ID)
-        TitanPanelRightClickMenu_AddSpacer()
-        TitanPanelRightClickMenu_AddCommand(TITAN_PANEL_MENU_HIDE, ID, TITAN_PANEL_MENU_FUNC_HIDE)
+        info = UIDropDownMenu_CreateInfo()
+        info.text = "Clear World Markers"
+        info.notCheckable = true
+        info.func = ClearWorldMarkers
+        UIDropDownMenu_AddButton(info, level)
     end
-end
-
-function TitanPanelRaidToolsButton_DoReadyCheck()
-    DoReadyCheck()
-end
-
-for i = 1, 8 do
-    _G["TitanPanelRaidToolsButton_SetRaidMarker" .. i] = function()
-        Markers:SetRaidMarker(i)
-    end
-    _G["TitanPanelRaidToolsButton_SetWorldMarker" .. i] = function()
-        Markers:SetWorldMarker(i)
-    end
-end
-
-function TitanPanelRaidToolsButton_ClearWorldMarkers()
-    Markers:ClearWorldMarkers()
-end
-
-function TitanPanelRaidToolsButton_OpenOptions()
-    if InterfaceOptionsFrame then
-        InterfaceOptionsFrame_OpenToCategory("Titan Panel: Raid Tools")
-        InterfaceOptionsFrame_OpenToCategory("Titan Panel: Raid Tools")
-    end
-end
-
-function TitanPanelRaidToolsButton_OnLoad(self)
-    self.registry = {
-        id = ID,
-        category = "Combat",
-        menuText = "Raid Tools",
-        buttonTextFunction = "TitanPanelRaidToolsButton_GetButtonText",
-        tooltipTitle = "Raid Tools",
-        tooltipTextFunction = "TitanPanelRaidToolsButton_GetTooltipText",
-        icon = "Interface\\AddOns\\TitanPanel_RaidTools\\media\\icon",
-        iconWidth = 16,
-        savedVariables = {
-            ShowIcon = 1,
-            ShowLabelText = 1,
-            ShowColoredText = 1,
-        },
-    }
-
-    TitanPanelButton_OnLoad(self)
-end
-
-function TitanPanelRaidToolsButton_OnEvent(self, event, ...)
-end
-
-function TitanPanelRaidToolsButton_OnUpdate(self, elapsed)
 end

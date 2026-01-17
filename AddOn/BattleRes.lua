@@ -1,3 +1,4 @@
+
 local addonName, ns = ...
 
 local BR = {}
@@ -7,40 +8,47 @@ BR.charges = 0
 BR.maxCharges = 0
 BR.cooldownRemaining = 0
 BR.cooldownDuration = 0
+BR.source = "NONE"
+BR.spellName = nil
 
-function BR:Refresh()
-    local charges, maxCharges, start, duration = C_Encounter.GetBattleResurrections()
-    if not charges or not maxCharges then
-        self.charges = 0
-        self.maxCharges = 0
-        self.cooldownRemaining = 0
-        self.cooldownDuration = 0
-        return
+------------------------------------------------------
+-- Retail spell-charge API wrappers (War Within)
+------------------------------------------------------
+local function RetailGetCharges(spellID)
+    if C_Spell and C_Spell.GetSpellCharges then
+        local charges, maxCharges, start, duration = C_Spell.GetSpellCharges(spellID)
+        return charges, maxCharges, start, duration
     end
-
-    self.charges = charges
-    self.maxCharges = maxCharges
-    self.cooldownDuration = duration or 0
-
-    if start and duration and duration > 0 then
-        local ends = start + duration
-        local remaining = ends - GetTime()
-        self.cooldownRemaining = remaining > 0 and remaining or 0
-    else
-        self.cooldownRemaining = 0
-    end
+    return nil, nil, nil, nil
 end
 
-local function FormatTime(seconds)
-    seconds = math.floor(seconds or 0)
-    if seconds <= 0 then
-        return "0s"
+local function RetailGetCooldown(spellID)
+    if C_Spell and C_Spell.GetSpellCooldown then
+        local start, duration = C_Spell.GetSpellCooldown(spellID)
+        return start, duration
     end
-    if seconds < 60 then
-        return seconds .. "s"
+    return nil, nil
+end
+
+local function RetailGetSpellName(spellID)
+    if C_Spell and C_Spell.GetSpellInfo then
+        local info = C_Spell.GetSpellInfo(spellID)
+        if info and info.name then
+            return info.name
+        end
     end
-    local m = math.floor(seconds / 60)
-    local s = seconds % 60
+    return "Battle Rez"
+end
+
+------------------------------------------------------
+-- Time formatting
+------------------------------------------------------
+local function FormatTime(sec)
+    sec = math.floor(sec or 0)
+    if sec <= 0 then return "0s" end
+    if sec < 60 then return sec .. "s" end
+    local m = math.floor(sec / 60)
+    local s = sec % 60
     if s > 0 then
         return string.format("%dm %ds", m, s)
     else
@@ -48,80 +56,158 @@ local function FormatTime(seconds)
     end
 end
 
-function BR:GetCharges()
-    self:Refresh()
-    return self.charges, self.maxCharges
+------------------------------------------------------
+-- Battle Rez spell IDs per class
+------------------------------------------------------
+local CLASS_BREZ_SPELL = {
+    DRUID       = 20484,   -- Rebirth
+    WARLOCK     = 20707,   -- Soulstone
+    DEATHKNIGHT = 61999,   -- Raise Ally
+    PALADIN     = 391054,  -- Intercession
+}
+
+------------------------------------------------------
+-- Refresh logic (Auto mode, War Within safe)
+------------------------------------------------------
+function BR:Refresh()
+    self.charges = 0
+    self.maxCharges = 0
+    self.cooldownRemaining = 0
+    self.cooldownDuration = 0
+    self.source = "NONE"
+    self.spellName = nil
+
+    --------------------------------------------------
+    -- 1) Try raid encounter pool if available
+    --------------------------------------------------
+    if C_Encounter and C_Encounter.GetBattleResurrections and IsEncounterInProgress() then
+        local c, m, start, dur = C_Encounter.GetBattleResurrections()
+        if m and m > 0 then
+            self.source = "ENCOUNTER"
+            self.charges = c or 0
+            self.maxCharges = m or 0
+
+            if start and dur and dur > 0 then
+                local ends = start + dur
+                local remain = ends - GetTime()
+                self.cooldownDuration = dur
+                self.cooldownRemaining = remain > 0 and remain or 0
+            end
+            return
+        end
+    end
+
+    --------------------------------------------------
+    -- 2) Fall back to class spell charges
+    --------------------------------------------------
+    local _, class = UnitClass("player")
+    local spellID = CLASS_BREZ_SPELL[class or ""]
+
+    if not spellID then
+        -- This class has no battle res at all
+        self.source = "NONE"
+        return
+    end
+
+    local charges, maxCharges, start, duration = RetailGetCharges(spellID)
+
+    --------------------------------------------------
+    -- No charges → use cooldown only
+    --------------------------------------------------
+    if not charges and not maxCharges then
+        local cdStart, cdDur = RetailGetCooldown(spellID)
+        if cdStart and cdDur and cdDur > 0 then
+            self.charges = 0
+            self.maxCharges = 1
+            self.cooldownDuration = cdDur
+            local r = (cdStart + cdDur) - GetTime()
+            self.cooldownRemaining = r > 0 and r or 0
+        else
+            self.charges = 1
+            self.maxCharges = 1
+        end
+
+        self.source = "CLASS"
+        self.spellName = RetailGetSpellName(spellID)
+        return
+    end
+
+    --------------------------------------------------
+    -- Normal charge system
+    --------------------------------------------------
+    self.charges = charges or 0
+    self.maxCharges = maxCharges or 0
+    self.source = "CLASS"
+    self.spellName = RetailGetSpellName(spellID)
+
+    if start and duration and duration > 0 then
+        self.cooldownDuration = duration
+        local r = (start + duration) - GetTime()
+        self.cooldownRemaining = r > 0 and r or 0
+    end
 end
 
-function BR:GetCooldown()
-    self:Refresh()
-    return self.cooldownRemaining, self.cooldownDuration
-end
-
+------------------------------------------------------
+-- Public API for Titan plugin
+------------------------------------------------------
 function BR:GetDisplayText()
     self:Refresh()
 
-    local mode = (ns.db and ns.db.DisplayMode) or "SMART"
-    local charges, maxCharges = self.charges, self.maxCharges
-    local cdRemaining = self.cooldownRemaining
-
-    if maxCharges == 0 then
+    if self.maxCharges == 0 then
         return "B-Rez: N/A"
     end
 
-    local base = string.format("B-Rez: %d/%d", charges, maxCharges)
+    local base = string.format("B-Rez: %d/%d", self.charges, self.maxCharges)
 
-    if mode == "CHARGES" then
-        return base
-    elseif mode == "COOLDOWN" then
-        if cdRemaining > 0 then
-            return string.format("%s (%s)", base, FormatTime(cdRemaining))
-        else
-            return base .. " (Ready)"
-        end
-    else -- SMART
-        if charges >= maxCharges or cdRemaining <= 0 then
-            return base
-        else
-            return string.format("%s (%s)", base, FormatTime(cdRemaining))
-        end
+    if self.cooldownRemaining > 0 then
+        return string.format("%s (%s)", base, FormatTime(self.cooldownRemaining))
     end
+
+    return base
 end
 
 function BR:GetTooltipLines()
     self:Refresh()
-    local charges, maxCharges = self.charges, self.maxCharges
-    local cdRemaining, cdDuration = self.cooldownRemaining, self.cooldownDuration
-
     local lines = {}
 
-    if maxCharges == 0 then
+    if self.maxCharges == 0 then
         table.insert(lines, "|cffffd100Battle Resurrections|r")
-        table.insert(lines, "Not active for this encounter or instance.")
+        table.insert(lines, "Not available.")
         return lines
     end
 
-    table.insert(lines, "|cffffd100Battle Resurrections|r")
-    table.insert(lines, string.format("Charges: |cffffffff%d|r / |cffffffff%d|r", charges, maxCharges))
-
-    if cdDuration and cdDuration > 0 then
-        table.insert(lines, string.format("Recharge: |cffffffff%s|r", FormatTime(cdDuration)))
-    end
-
-    if cdRemaining and cdRemaining > 0 then
-        table.insert(lines, string.format("Next charge in: |cffffffff%s|r", FormatTime(cdRemaining)))
+    if self.source == "ENCOUNTER" then
+        table.insert(lines, "|cffffd100Battle Resurrections (Raid)|r")
     else
-        table.insert(lines, "Next charge: |cffffffffReady|r")
+        table.insert(lines, string.format("|cffffd100%s|r", self.spellName or "Battle Rez"))
     end
+
+    table.insert(lines, string.format("Charges: %d/%d", self.charges, self.maxCharges))
+
+    if self.cooldownDuration > 0 then
+        table.insert(lines, "Recharge: " .. FormatTime(self.cooldownDuration))
+    end
+
+    if self.cooldownRemaining > 0 then
+        table.insert(lines, "Next charge in: " .. FormatTime(self.cooldownRemaining))
+    else
+        table.insert(lines, "Next charge: Ready")
+    end
+
+    table.insert(lines, "Source: " .. (self.source == "ENCOUNTER" and "Raid encounter pool" or "Class spell charges"))
 
     return lines
 end
 
+------------------------------------------------------
+-- Event handler
+------------------------------------------------------
 local f = CreateFrame("Frame")
+f:RegisterEvent("SPELL_UPDATE_CHARGES")
+f:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:RegisterEvent("ENCOUNTER_START")
 f:RegisterEvent("ENCOUNTER_END")
-f:RegisterEvent("PLAYER_ENTERING_WORLD")
-f:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 
 f:SetScript("OnEvent", function()
     BR:Refresh()
