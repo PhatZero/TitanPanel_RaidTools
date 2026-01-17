@@ -2,7 +2,7 @@
 ## Title: Titan Panel: Raid Tools
 ## Notes: Ready checks, battle res tracking, and marker utilities for Titan Panel.
 ## Author: PhatZero
-## Version: 1.0.0
+## Version: @project-version@
 ## Dependencies: Titan
 ## SavedVariables: TitanPanelRaidToolsDB
 

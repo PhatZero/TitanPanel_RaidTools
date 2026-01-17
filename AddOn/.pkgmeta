@@ -1,0 +1,10 @@
+package-as: TitanPanelRaidTools
+
+move-folders:
+  Addon/TitanPanelRaidTools: TitanPanelRaidTools
+
+ignore:
+  - .github
+  - README.md
+  - LICENSE
+  - .gitignore
