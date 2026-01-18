@@ -1,0 +1,8 @@
+package-as: TitanPanelRaidTools
+
+ignore:
+  - .github
+  - README.md
+  - LICENSE
+  - CHANGELOG.md
+  - wago.json
