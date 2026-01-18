@@ -33,5 +33,11 @@ jobs:
           ls -la TitanPanelRaidTools || true
 
           echo ""
-          echo "== TOC files found =="
-          find . -maxdepth 4 -type f -name "*.toc" -print*
+          echo "== TOC files found (ls) =="
+          ls -la TitanPanelRaidTools/*.toc || true
+
+      - name: Package
+        uses: BigWigsMods/packager@v2
+        env:
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
