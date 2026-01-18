@@ -1,4 +1,4 @@
-name: Package and release
+name: Packager
 
 on:
   push:
@@ -34,4 +34,5 @@ jobs:
       - name: Package addon
         uses: BigWigsMods/packager@v2
         env:
-          GITHUB_OAUTH: ${{ secrets.GITHUB_TOK
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
