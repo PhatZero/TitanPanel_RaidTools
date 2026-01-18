@@ -18,30 +18,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # DEBUG: show folder layout so we can see what the packager will pick up
-      - name: Debug repo tree
-        run: |
-          echo "== Repo root =="
-          ls -la
-          echo ""
-          echo "== Top-level directories (depth 2) =="
-          find . -maxdepth 2 -type d -print
-          echo ""
-          echo "== TOC files found =="
-          find . -maxdepth 4 -type f -name "*.toc" -print
-          echo ""
-          echo "== pkgmeta files found =="
-          find . -maxdepth 3 -type f -name ".pkgmeta" -print
-          echo ""
-          echo "== AddOn folder listing (if present) =="
-          ls -la AddOn || true
-          echo ""
-          echo "== Addon folder listing (if present) =="
-          ls -la Addon || true
-          echo ""
-          echo "== release dir (if already created) =="
-          ls -la .release || true
-
       - name: Package (GitHub Release + CurseForge)
         uses: BigWigsMods/packager@v2
         env:
