@@ -1,7 +1,12 @@
 package-as: TitanPanelRaidTools
 
-ignore:
-  - "*"
+move-folders:
+  AddOn: .
 
-move-files:
-  AddOn/*: TitanPanelRaidTools
+ignore:
+  - .github
+  - README.md
+  - LICENSE
+  - wago.json
+  - icon.png
+  - banner.png
