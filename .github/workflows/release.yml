@@ -13,24 +13,11 @@ jobs:
   package:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Debug layout
-        run: |
-          echo "=== Repo root ==="
-          ls -la
-          echo "=== Addon folder ==="
-          ls -la TitanPanelRaidTools
-          echo "=== TOC ==="
-          ls -la TitanPanelRaidTools/*.toc || true
-
-      - name: Package addon
-        uses: BigWigsMods/packager@v2
-        with:
-          args: -t TitanPanelRaidTools
+      - uses: BigWigsMods/packager@v2
         env:
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
