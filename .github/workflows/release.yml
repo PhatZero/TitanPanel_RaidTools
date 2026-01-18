@@ -1,4 +1,4 @@
-name: Packager
+name: Package and release
 
 on:
   push:
@@ -12,22 +12,18 @@ permissions:
 jobs:
   package:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Safety debug (does NOT fail the job)
       - name: Debug layout
         run: |
           echo "=== Repo root ==="
           ls -la
-          echo ""
           echo "=== Addon folder ==="
           ls -la TitanPanelRaidTools
-          echo ""
           echo "=== TOC ==="
           ls -la TitanPanelRaidTools/*.toc || true
 
