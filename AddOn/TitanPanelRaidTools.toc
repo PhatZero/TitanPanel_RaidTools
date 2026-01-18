@@ -8,8 +8,8 @@
 
 ## X-Curse-Project-ID: 1432021
 
-## IconTexture: Interface/AddOns/TitanPanelRaidTools/media/icon
-## X-Banner: Interface/AddOns/TitanPanelRaidTools/media/banner
+## IconTexture: Interface/AddOns/media/icon
+## X-Banner: Interface/AddOns/media/banner
 
 Compat.lua
 Core.lua
