@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - "v*.*.*"
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -18,8 +18,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Package (GitHub Release + CurseForge)
-        uses: BigWigsMods/packager@v2
-        env:
-          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
-          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      - name: Debug - show files & TOCs
+        run: |
+          echo "== git HEAD =="
+          git rev-parse HEAD
+          git --no-pager log -1 --oneline
+
+          echo ""
+          echo "== repo root =="
+          ls -la
+
+          echo ""
+          echo "== TitanPanelRaidTools folder =="
+          ls -la TitanPanelRaidTools || true
+
+          echo ""
+          echo "== TOC files found =="
+          find . -maxdepth 4 -type f -name "*.toc" -print*
