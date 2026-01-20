@@ -1,4 +1,4 @@
-## Interface: 110207
+## Interface: 120000
 ## Title: Titan Panel: Raid Tools
 ## Notes: Ready checks, battle res tracking, and marker utilities for Titan Panel.
 ## Author: PhatZero
