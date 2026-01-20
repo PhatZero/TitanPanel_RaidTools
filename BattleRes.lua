@@ -4,6 +4,14 @@ local addonName, ns = ...
 local BR = {}
 ns.BR = BR
 
+-- Simple debug toggle (off by default)
+ns.debug = ns.debug or false
+local function DebugPrint(...)
+    if ns.debug then
+        print("|cffffd100[RaidTools]|r", ...)
+    end
+end
+
 BR.charges = 0
 BR.maxCharges = 0
 BR.cooldownRemaining = 0
@@ -80,7 +88,8 @@ function BR:Refresh()
     --------------------------------------------------
     -- 1) Try raid encounter pool if available
     --------------------------------------------------
-    if C_Encounter and C_Encounter.GetBattleResurrections and IsEncounterInProgress() then
+    local encounterOK = C_Encounter and C_Encounter.GetBattleResurrections and IsEncounterInProgress
+    if encounterOK and IsEncounterInProgress() then
         local c, m, start, dur = C_Encounter.GetBattleResurrections()
         if m and m > 0 then
             self.source = "ENCOUNTER"
@@ -100,11 +109,11 @@ function BR:Refresh()
     --------------------------------------------------
     -- 2) Fall back to class spell charges
     --------------------------------------------------
-    local _, class = UnitClass("player")
+    local _, class = UnitClass and UnitClass("player") or nil, nil
     local spellID = CLASS_BREZ_SPELL[class or ""]
 
     if not spellID then
-        -- This class has no battle res at all
+        -- This class has no battle res at all on this client
         self.source = "NONE"
         return
     end
@@ -150,42 +159,45 @@ end
 ------------------------------------------------------
 -- Public API for Titan plugin
 ------------------------------------------------------
-function BR:GetDisplayText()
+
+-- Single source of truth for BR counts.
+-- Always returns numbers, defaulting to 0, 0 if APIs are unavailable.
+function BR:GetCounts()
     self:Refresh()
+    local a = tonumber(self.charges) or 0
+    local t = tonumber(self.maxCharges) or 0
+    return a, t
+end
 
-    if self.maxCharges == 0 then
-        return "B-Rez: N/A"
-    end
-
-    local base = string.format("B-Rez: %d/%d", self.charges, self.maxCharges)
-
-    if self.cooldownRemaining > 0 then
-        return string.format("%s (%s)", base, FormatTime(self.cooldownRemaining))
-    end
-
-    return base
+function BR:GetDisplayText()
+    local a, t = self:GetCounts()
+    return string.format("BR %d/%d", a, t)
 end
 
 function BR:GetTooltipLines()
     self:Refresh()
     local lines = {}
 
-    if self.maxCharges == 0 then
-        table.insert(lines, "|cffffd100Battle Resurrections|r")
-        table.insert(lines, "Not available.")
+    table.insert(lines, "|cffffd100Battle Resurrections|r")
+
+    local a, t = self:GetCounts()
+
+    if t == 0 then
+        table.insert(lines, "No active encounter battle res pool detected.")
+        table.insert(lines, "Outside of raid encounters this may show 0/0 even if your class has a personal battle res.")
         return lines
     end
 
     if self.source == "ENCOUNTER" then
-        table.insert(lines, "|cffffd100Battle Resurrections (Raid)|r")
+        table.insert(lines, "Source: Raid encounter pool (C_Encounter).")
     else
-        table.insert(lines, string.format("|cffffd100%s|r", self.spellName or "Battle Rez"))
+        table.insert(lines, string.format("Source: %s spell charges.", self.spellName or "Battle Rez"))
     end
 
-    table.insert(lines, string.format("Charges: %d/%d", self.charges, self.maxCharges))
+    table.insert(lines, string.format("Charges: %d/%d", a, t))
 
     if self.cooldownDuration > 0 then
-        table.insert(lines, "Recharge: " .. FormatTime(self.cooldownDuration))
+        table.insert(lines, "Recharge time: " .. FormatTime(self.cooldownDuration))
     end
 
     if self.cooldownRemaining > 0 then
@@ -194,7 +206,7 @@ function BR:GetTooltipLines()
         table.insert(lines, "Next charge: Ready")
     end
 
-    table.insert(lines, "Source: " .. (self.source == "ENCOUNTER" and "Raid encounter pool" or "Class spell charges"))
+    table.insert(lines, "Note: Counts are encounter-based and may show 0/0 outside active boss fights.")
 
     return lines
 end
@@ -208,7 +220,12 @@ f:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:RegisterEvent("ENCOUNTER_START")
 f:RegisterEvent("ENCOUNTER_END")
+f:RegisterEvent("GROUP_ROSTER_UPDATE")
 
 f:SetScript("OnEvent", function()
     BR:Refresh()
+    -- Ask Titan to refresh our button if possible
+    if TitanPanelButton_UpdateButton then
+        TitanPanelButton_UpdateButton("RaidTools")
+    end
 end)

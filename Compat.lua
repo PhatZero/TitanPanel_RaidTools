@@ -17,5 +17,15 @@ function ns.Compat.OpenOptions(categoryName)
 end
 
 function ns.Compat.HasWorldMarkers()
-    return type(PlaceRaidMarker) == "function" and type(ClearRaidMarker) == "function"
+    -- Prefer explicit APIs if they exist
+    if type(PlaceRaidMarker) == "function" and type(ClearRaidMarker) == "function" then
+        return true
+    end
+
+    -- Fallback to macro-based placement if secure environment allows it
+    if type(RunMacroText) == "function" then
+        return true
+    end
+
+    return false
 end
