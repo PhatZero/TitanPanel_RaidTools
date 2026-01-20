@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.0.4 – Midnight (12.0) Prepatch
+- Updated `## Interface` in `TitanPanelRaidTools.toc` to `120000` for Midnight 12.0 prepatch compatibility.
+- Confirmed existing Battle Rez, ReadyCheck, and World Marker logic works against the new client using stable APIs and safe fallbacks.
+- Kept Titan Panel registration and right-click menu structure unchanged to avoid regressions; the plugin still appears as “Raid Tools” with BR icon + `BR x/y` on the bar.
+
 ## v1.0.0.3 – War Within BR + Menu polish
 - Updated TOC for War Within (11.x) and Titan dependency using `## RequiredDeps: Titan`.
 - Fixed media paths so icon and banner load from `Interface/AddOns/TitanPanelRaidTools/media/...`.
