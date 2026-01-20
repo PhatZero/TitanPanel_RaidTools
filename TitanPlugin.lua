@@ -1,9 +1,14 @@
 local addonName, ns = ...
 local Compat = ns.Compat
+local BR = ns.BR
 
 local TITAN_ID = "RaidTools"
 local TITAN_BUTTON = "TitanPanel" .. TITAN_ID .. "Button"
+local BR_ICON = "|TInterface\\Icons\\spell_nature_reincarnation:14:14|t"
 
+--------------------------------------------------------
+-- Internal helpers
+--------------------------------------------------------
 local function IsLeaderOrAssist()
     return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
 end
@@ -41,7 +46,8 @@ local function PlaceWorldMarker(markerIndex)
         print("|cffffd100[RaidTools]|r You must be leader/assistant to place world markers.")
         return
     end
-    if InCombatLockdown() then
+    if InCombatLockdown and InCombatLockdown() then
+        -- Safely no-op in combat
         print("|cffff0000[RaidTools]|r Cannot place world markers in combat.")
         return
     end
@@ -49,6 +55,14 @@ local function PlaceWorldMarker(markerIndex)
         print("|cffffd100[RaidTools]|r World markers are not supported on this client.")
         return
     end
+
+    -- Prefer Blizzard APIs if available
+    if type(PlaceRaidMarker) == "function" then
+        PlaceRaidMarker(markerIndex)
+        return
+    end
+
+    -- Fallback to macro placement (/wm)
     if type(RunMacroText) == "function" then
         -- Note: /wm enters placement mode; click the ground to drop it.
         RunMacroText("/wm " .. tostring(markerIndex))
@@ -64,7 +78,8 @@ local function ClearWorldMarkers()
         print("|cffffd100[RaidTools]|r You must be leader/assistant to clear world markers.")
         return
     end
-    if InCombatLockdown() then
+    if InCombatLockdown and InCombatLockdown() then
+        -- Safely no-op in combat
         print("|cffff0000[RaidTools]|r Cannot clear world markers in combat.")
         return
     end
@@ -73,23 +88,26 @@ local function ClearWorldMarkers()
         return
     end
 
+    -- Prefer Blizzard API if available
     if type(ClearRaidMarker) == "function" then
         ClearRaidMarker()
         return
     end
+
+    -- Fallback to macro clear (/cwm 0)
     if type(RunMacroText) == "function" then
         RunMacroText("/cwm 0")
     end
 end
 
--------------------------------------------------------
+--------------------------------------------------------
 -- Titan Button
--------------------------------------------------------
+--------------------------------------------------------
 local button = CreateFrame("Button", TITAN_BUTTON, UIParent, "TitanPanelComboTemplate")
 button.registry = {
     id = TITAN_ID,
     category = "General",
-    version = "1.0.0",
+    version = GetAddOnMetadata and GetAddOnMetadata(addonName, "Version") or "1.0.0",
     menuText = "RaidTools",
     buttonTextFunction = "TitanPanelRaidToolsButton_GetButtonText",
     tooltipTitle = "RaidTools",
@@ -104,19 +122,45 @@ button.registry = {
 }
 
 function TitanPanelRaidToolsButton_GetButtonText(id)
-    return "RaidTools"
+    local label = "Raid Tools"
+    local a, t = 0, 0
+
+    if BR and BR.GetCounts then
+        a, t = BR:GetCounts()
+    end
+
+    -- Icon + BR counts live in the value so they always show,
+    -- even if Titan is set to hide the label text.
+    -- Leading space creates a visible gap after "Raid Tools".
+    local value = string.format(" %s BR %d/%d", BR_ICON, a or 0, t or 0)
+
+    return label, value
 end
 
 function TitanPanelRaidToolsButton_GetTooltipText()
-    return "Right-click: Ready Check & World Markers"
+    local lines = {}
+
+    if BR and BR.GetTooltipLines then
+        local brLines = BR:GetTooltipLines()
+        for i = 1, #brLines do
+            table.insert(lines, brLines[i])
+        end
+        table.insert(lines, " ")
+    end
+
+    table.insert(lines, "|cffffd100Raid Tools|r")
+    table.insert(lines, "- Right-click: Ready Check and World Markers menu")
+    table.insert(lines, "- Ready checks and world markers require leader or assistant privileges.")
+
+    return table.concat(lines, "\n")
 end
 
--------------------------------------------------------
+--------------------------------------------------------
 -- Titan Right-click Menu
 -- RaidTools
 --  -> ReadyCheck
 --  -> World Markers (submenu)
--------------------------------------------------------
+--------------------------------------------------------
 function TitanPanelRightClickMenu_PrepareRaidToolsMenu()
     local info
     local level = UIDROPDOWNMENU_MENU_LEVEL
